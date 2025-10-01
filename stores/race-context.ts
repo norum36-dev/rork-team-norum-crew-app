@@ -2,9 +2,10 @@ import createContextHook from '@nkzw/create-context-hook';
 import { useState, useCallback, useMemo, useEffect } from 'react';
 import { Race, ScheduledEvent, Inventory, HealthData, EventItem } from '@/types/nutrition';
 import { DEFAULT_PATTERN, DEFAULT_PROTEIN_SLOTS, INITIAL_INVENTORY } from '@/constants/nutrition';
-import { Platform, Alert } from 'react-native';
+import { Platform, Alert, AppState } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { backupService } from '@/utils/backup-service';
+import { persistenceService, AppState as PersistedAppState } from '@/utils/persistence-service';
 
 const createInitialRace = (): Race => ({
   id: 'race-2025-10-18',
@@ -81,6 +82,7 @@ export const [RaceProvider, useRaceStore] = createContextHook(() => {
   const [consecutiveSkips, setConsecutiveSkips] = useState<number>(0);
   const [skipAlarmActive, setSkipAlarmActive] = useState<boolean>(false);
   const [backupStatus, setBackupStatus] = useState(backupService.getStatus());
+  const [isLoaded, setIsLoaded] = useState<boolean>(false);
 
   const triggerSkipAlarm = useCallback(() => {
     setSkipAlarmActive(true);
@@ -381,6 +383,97 @@ export const [RaceProvider, useRaceStore] = createContextHook(() => {
     setBackupStatus(backupService.getStatus());
   }, []);
 
+  // Persistence functions
+  const getCurrentAppState = useCallback((): PersistedAppState => ({
+    race,
+    events,
+    inventory,
+    health,
+    consecutiveSkips,
+    lastSaved: new Date().toISOString(),
+  }), [race, events, inventory, health, consecutiveSkips]);
+
+  const loadPersistedState = useCallback(async () => {
+    try {
+      const savedState = await persistenceService.loadAppState();
+      if (savedState) {
+        console.log('📱 Loading persisted app state...');
+        setRace(savedState.race);
+        setEvents(savedState.events);
+        setInventory(savedState.inventory);
+        setHealth(savedState.health);
+        setConsecutiveSkips(savedState.consecutiveSkips);
+        console.log('✅ App state restored from storage');
+      }
+    } catch (error) {
+      console.error('❌ Failed to load persisted state:', error);
+    } finally {
+      setIsLoaded(true);
+      persistenceService.setInitialized(true);
+    }
+  }, []);
+
+  const resetApp = useCallback(async () => {
+    Alert.alert(
+      '🔄 Tilbakestill App',
+      'Er du sikker på at du vil tilbakestille appen? Dette vil slette all data og kan ikke angres.\n\nDette bør kun gjøres under prøveperioden.',
+      [
+        {
+          text: 'Avbryt',
+          style: 'cancel',
+        },
+        {
+          text: 'Bekreft tilbakestilling',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              // Stop backup service
+              if (backupService.isRunning()) {
+                stopBackupService();
+              }
+              
+              // Clear persisted data
+              await persistenceService.clearAppState();
+              
+              // Reset all state to initial values
+              setRace(null);
+              setEvents([]);
+              setInventory(INITIAL_INVENTORY);
+              setHealth(createInitialHealth());
+              setConsecutiveSkips(0);
+              setSkipAlarmActive(false);
+              
+              // Show success message
+              Alert.alert(
+                '✅ App Tilbakestilt',
+                'Appen har blitt tilbakestilt til opprinnelig tilstand.',
+                [{ text: 'OK' }]
+              );
+              
+              console.log('🔄 App reset completed');
+            } catch (error) {
+              console.error('❌ Failed to reset app:', error);
+              Alert.alert(
+                '❌ Feil',
+                'Kunne ikke tilbakestille appen. Prøv igjen.',
+                [{ text: 'OK' }]
+              );
+            }
+          },
+        },
+      ],
+      { cancelable: true }
+    );
+  }, [stopBackupService]);
+
+  // Auto-save functionality
+  const autoSave = useCallback(() => {
+    if (persistenceService.getInitialized() && race) {
+      const currentState = getCurrentAppState();
+      persistenceService.autoSave(currentState);
+    }
+  }, [getCurrentAppState, race]);
+
   // Start backup service when race is initialized
   useEffect(() => {
     if (race && !backupService.isRunning()) {
@@ -402,6 +495,43 @@ export const [RaceProvider, useRaceStore] = createContextHook(() => {
     return () => clearInterval(interval);
   }, []);
 
+  // Load persisted state on app start
+  useEffect(() => {
+    loadPersistedState();
+  }, [loadPersistedState]);
+
+  // Auto-save when state changes
+  useEffect(() => {
+    autoSave();
+  }, [race, events, inventory, health, consecutiveSkips, autoSave]);
+
+  // Handle app lifecycle events for background/foreground
+  useEffect(() => {
+    const handleAppStateChange = (nextAppState: string) => {
+      console.log('📱 App state changed to:', nextAppState);
+      
+      if (nextAppState === 'background' || nextAppState === 'inactive') {
+        // Save immediately when app goes to background
+        if (persistenceService.getInitialized() && race) {
+          const currentState = getCurrentAppState();
+          persistenceService.saveAppState(currentState);
+          console.log('💾 App state saved due to background transition');
+        }
+      }
+      
+      if (nextAppState === 'active') {
+        // App came back to foreground - could reload if needed
+        console.log('🔄 App returned to foreground');
+      }
+    };
+
+    const subscription = AppState.addEventListener('change', handleAppStateChange);
+    
+    return () => {
+      subscription?.remove();
+    };
+  }, [getCurrentAppState, race]);
+
   return useMemo(() => ({
     race,
     events,
@@ -410,6 +540,7 @@ export const [RaceProvider, useRaceStore] = createContextHook(() => {
     consecutiveSkips,
     skipAlarmActive,
     backupStatus,
+    isLoaded,
     initializeRace,
     updateRaceSettings,
     updateRaceToggles,
@@ -425,6 +556,7 @@ export const [RaceProvider, useRaceStore] = createContextHook(() => {
     stopBackupService,
     manualBackup,
     updateBackupConfig,
+    resetApp,
   }), [
     race,
     events,
@@ -433,6 +565,7 @@ export const [RaceProvider, useRaceStore] = createContextHook(() => {
     consecutiveSkips,
     skipAlarmActive,
     backupStatus,
+    isLoaded,
     initializeRace,
     updateRaceSettings,
     updateRaceToggles,
@@ -448,5 +581,6 @@ export const [RaceProvider, useRaceStore] = createContextHook(() => {
     stopBackupService,
     manualBackup,
     updateBackupConfig,
+    resetApp,
   ]);
 });

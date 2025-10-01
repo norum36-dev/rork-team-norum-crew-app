@@ -1,11 +1,12 @@
 import React from 'react';
-import { View, Text, StyleSheet, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRaceStore } from '@/stores/race-context';
+import { RotateCcw } from 'lucide-react-native';
 
 export default function InventoryScreen() {
   const insets = useSafeAreaInsets();
-  const { inventory } = useRaceStore();
+  const { inventory, resetApp } = useRaceStore();
 
   const rows = [
     { key: 'GEL100', label: 'GEL100' },
@@ -28,6 +29,22 @@ export default function InventoryScreen() {
             </View>
           ))}
         </View>
+        
+        {/* Reset App Section - Only for testing period */}
+        <View style={styles.resetSection}>
+          <Text style={styles.resetSectionTitle}>Prøveperiode</Text>
+          <TouchableOpacity 
+            style={styles.resetButton} 
+            onPress={resetApp}
+            testID="reset-app-button"
+          >
+            <RotateCcw size={20} color="#DC2626" />
+            <Text style={styles.resetButtonText}>Tilbakestill App</Text>
+          </TouchableOpacity>
+          <Text style={styles.resetWarning}>
+            ⚠️ Dette vil slette all data og kan ikke angres. Kun for bruk under prøveperioden.
+          </Text>
+        </View>
       </ScrollView>
     </View>
   );
@@ -42,4 +59,42 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#F3F4F6', paddingHorizontal: 8 },
   cellLeft: { color: '#374151', fontWeight: '500' },
   cellRight: { color: '#111827', fontWeight: '700' },
+  resetSection: {
+    marginTop: 24,
+    backgroundColor: '#FEF2F2',
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#FECACA',
+  },
+  resetSectionTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#DC2626',
+    marginBottom: 12,
+  },
+  resetButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFFFFF',
+    borderWidth: 2,
+    borderColor: '#DC2626',
+    borderRadius: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    marginBottom: 12,
+    gap: 8,
+  },
+  resetButtonText: {
+    color: '#DC2626',
+    fontWeight: '600',
+    fontSize: 16,
+  },
+  resetWarning: {
+    fontSize: 12,
+    color: '#7F1D1D',
+    textAlign: 'center',
+    lineHeight: 16,
+  },
 });
