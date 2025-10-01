@@ -2,6 +2,11 @@
   "build": {
     "preview": {
       "android": { "buildType": "apk" }
+    },
+    "debug": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "android": { "buildType": "apk" }
     }
   }
 }
