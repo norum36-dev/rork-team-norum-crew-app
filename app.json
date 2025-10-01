@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "Team Norum Crew App",
-    "slug": "ultra-crew-nutrition-health-assistant",
+    "name": "Norum Crew",
+    "slug": "norum-crew",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -22,7 +22,7 @@
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "app.rork.ultra-crew-nutrition-health-assistant",
+      "package": "no.norum.crewapp",
       "permissions": [
         "android.permission.VIBRATE"
       ]
