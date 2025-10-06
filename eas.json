@@ -8,5 +8,8 @@
       "distribution": "internal",
       "android": { "buildType": "apk" }
     }
+  },
+  "cli": {
+    "appVersionSource": "remote"
   }
 }
