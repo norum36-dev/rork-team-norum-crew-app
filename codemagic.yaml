@@ -4,14 +4,25 @@ workflows:
     max_build_duration: 60
     environment:
       vars:
-        ANDROID_APP_DIR: "android"
-        ANDROID_MODULE: "app"
+        NODE_VERSION: "20"
     scripts:
+      - name: Installer Node og avhengigheter
+        script: |
+          echo "Using Node $NODE_VERSION"
+          nvm install $NODE_VERSION
+          nvm use $NODE_VERSION
+          npm ci
+
+      - name: Generer native Android-prosjekt (expo prebuild)
+        script: |
+          npx expo prebuild --platform android --non-interactive --no-install
+
       - name: Gjenopprett keystore fra base64
         script: |
           echo "Restoring keystore to android/app/upload-keystore.jks"
           mkdir -p $CM_BUILD_DIR/android/app
           echo $CM_KEYSTORE | base64 --decode > $CM_BUILD_DIR/android/app/upload-keystore.jks
+          ls -la $CM_BUILD_DIR/android/app
 
       - name: Legg til signing-properties til Gradle
         script: |
@@ -22,12 +33,14 @@ workflows:
           MYAPP_UPLOAD_KEY_PASSWORD=$CM_KEY_PASSWORD
           EOF
           echo "Signing properties appended to android/gradle.properties"
+          cat $CM_BUILD_DIR/android/gradle.properties | sed 's/.*PASSWORD.*/[HIDDEN]/g'
 
-      - name: Bygg Release APK (signert)
+      - name: Bygg signert Release APK
         script: |
           cd android
+          chmod +x ./gradlew
           ./gradlew clean
-          ./gradlew :app:assembleRelease
+          ./gradlew :app:assembleRelease --stacktrace
 
     artifacts:
       - android/app/build/outputs/apk/release/app-release.apk
