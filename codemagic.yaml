@@ -4,12 +4,12 @@ workflows:
     max_build_duration: 60
     environment:
       vars:
-        # Ikke bruk nvm; Codemagic-bildet har allerede Node
-        # Vi lar Corepack styre Yarn om yarn.lock finnes
-        CI: "true"
+        CI: "1"                       # Ikke-interaktiv modus
+        EXPO_NO_TELEMETRY: "1"
     scripts:
       - name: Installer avhengigheter (auto-detect Yarn/NPM)
         script: |
+          set -e
           if [ -f yarn.lock ]; then
             echo "Detected yarn.lock → using Yarn"
             corepack enable
@@ -27,20 +27,42 @@ workflows:
           fi
           echo "Package manager: $PKG_MGR"
 
+      - name: Sørg for at Expo er installert (expo@^54)
+        script: |
+          set -e
+          node -e "const fs=require('fs');const p=JSON.parse(fs.readFileSync('package.json','utf8'));process.exit(p.dependencies && p.dependencies.expo ? 0 : 1)"
+          if [ $? -ne 0 ]; then
+            echo "Expo mangler → installerer expo@^54"
+            if [ -f yarn.lock ]; then
+              corepack enable
+              corepack prepare yarn@stable --activate
+              yarn add expo@^54
+            else
+              npm install --save expo@^54
+            fi
+          else
+            echo "Expo finnes allerede i dependencies"
+          fi
+          npx expo --version
+
       - name: Generer native Android-prosjekt (expo prebuild)
         script: |
-          npx expo prebuild --platform android --non-interactive --no-install
+          set -e
+          # CI=1 gjør kommandolinjen ikke-interaktiv
+          npx expo prebuild --platform android --no-install
 
       - name: Gjenopprett keystore fra base64
         script: |
+          set -e
           echo "Restoring keystore to android/app/upload-keystore.jks"
-          mkdir -p $CM_BUILD_DIR/android/app
-          echo $CM_KEYSTORE | base64 --decode > $CM_BUILD_DIR/android/app/upload-keystore.jks
-          ls -la $CM_BUILD_DIR/android/app
+          mkdir -p "$CM_BUILD_DIR/android/app"
+          echo "$CM_KEYSTORE" | base64 --decode > "$CM_BUILD_DIR/android/app/upload-keystore.jks"
+          ls -la "$CM_BUILD_DIR/android/app"
 
       - name: Legg til signing-properties til Gradle
         script: |
-          cat >> $CM_BUILD_DIR/android/gradle.properties <<EOF
+          set -e
+          cat >> "$CM_BUILD_DIR/android/gradle.properties" <<EOF
           MYAPP_UPLOAD_STORE_FILE=upload-keystore.jks
           MYAPP_UPLOAD_KEY_ALIAS=$CM_KEY_ALIAS
           MYAPP_UPLOAD_STORE_PASSWORD=$CM_KEYSTORE_PASSWORD
@@ -48,10 +70,11 @@ workflows:
           EOF
           echo "Signing properties appended to android/gradle.properties"
           # Masker passord i logg
-          sed -E 's/(PASSWORD=).+/\1[HIDDEN]/g' $CM_BUILD_DIR/android/gradle.properties || true
+          sed -E 's/(PASSWORD=).+/\1[HIDDEN]/g' "$CM_BUILD_DIR/android/gradle.properties" || true
 
       - name: Bygg signert Release APK
         script: |
+          set -e
           cd android
           chmod +x ./gradlew
           ./gradlew clean
