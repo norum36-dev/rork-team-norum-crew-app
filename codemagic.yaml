@@ -1,18 +1,17 @@
 workflows:
   expo-apk:
-    name: Expo APK
-    # Øk tidslimit fra 60 til 120 min
-    max_build_duration: 120
+    name: Expo APK (no-wait)
+    # Kort og robust: vi *triggrer* EAS-build og avslutter jobben raskt.
     environment:
       node: 20
       groups:
-        - expo
+        - expo        # inneholder EXPO_TOKEN i Codemagic
     cache:
       cache_paths:
         - ~/.npm
         - $CM_BUILD_DIR/node_modules
     scripts:
-      - name: Install dependencies (npm, stabil og rask)
+      - name: Install dependencies (npm, tolerant)
         script: |
           echo "legacy-peer-deps=true" > .npmrc
           if [ -f package-lock.json ]; then
@@ -20,17 +19,15 @@ workflows:
           else
             npm install --no-audit --fund=false
           fi
-      - name: Install EAS CLI and auth
+      - name: Install EAS CLI and authenticate
         script: |
           npm i -g eas-cli
           eas whoami || eas login --token "$EXPO_TOKEN"
-      - name: Build Android APK with EAS (preview profile)
+      - name: Trigger EAS build (do not wait) and print dashboard URL
         script: |
-          eas build -p android --profile preview --non-interactive --json > build.json
-      - name: Download APK artifact
-        script: |
+          URL=$(eas build -p android --profile preview --non-interactive --no-wait --json | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{const j=JSON.parse(s);const b=Array.isArray(j)?j[0]:j;console.log(b?.webUrl||b?.dashboardUrl||b?.buildUrl||'')});")
+          echo "EAS build URL: $URL"
           mkdir -p artifacts
-          node -e "const fs=require('fs'); const j=JSON.parse(fs.readFileSync('build.json','utf8')); const b=Array.isArray(j)?j[0]:j; const u=b?.artifacts?.applicationArchiveUrl||b?.artifacts?.buildUrl; if(!u){console.error(j); throw new Error('No APK URL');} console.log(u)" > apk_url.txt
-          curl -L "$(cat apk_url.txt)" -o artifacts/app-preview.apk
+          echo "$URL" > artifacts/eas_build_url.txt
     artifacts:
-      - artifacts/*.apk
+      - artifacts/eas_build_url.txt
