@@ -4,7 +4,7 @@ workflows:
     max_build_duration: 60
     environment:
       vars:
-        CI: "1"                       # Ikke-interaktiv modus
+        CI: "1"
         EXPO_NO_TELEMETRY: "1"
     scripts:
       - name: Installer avhengigheter (auto-detect Yarn/NPM)
@@ -21,8 +21,8 @@ workflows:
             npm ci
             export PKG_MGR="npm"
           else
-            echo "No lockfile found → fallback to NPM install"
-            npm install
+            echo "No lockfile found → fallback to NPM install (legacy peer deps)"
+            npm install --legacy-peer-deps
             export PKG_MGR="npm"
           fi
           echo "Package manager: $PKG_MGR"
@@ -38,17 +38,22 @@ workflows:
               corepack prepare yarn@stable --activate
               yarn add expo@^54
             else
-              npm install --save expo@^54
+              npm install --save expo@^54 --legacy-peer-deps
             fi
           else
             echo "Expo finnes allerede i dependencies"
           fi
           npx expo --version
 
+      - name: Harmoniser Expo peer-deps (React/React Native)
+        script: |
+          set -e
+          # Dette sikrer at react / react-dom / react-native får versjoner som matcher Expo SDK 54
+          npx expo install react react-dom react-native
+
       - name: Generer native Android-prosjekt (expo prebuild)
         script: |
           set -e
-          # CI=1 gjør kommandolinjen ikke-interaktiv
           npx expo prebuild --platform android --no-install
 
       - name: Gjenopprett keystore fra base64
@@ -69,7 +74,6 @@ workflows:
           MYAPP_UPLOAD_KEY_PASSWORD=$CM_KEY_PASSWORD
           EOF
           echo "Signing properties appended to android/gradle.properties"
-          # Masker passord i logg
           sed -E 's/(PASSWORD=).+/\1[HIDDEN]/g' "$CM_BUILD_DIR/android/gradle.properties" || true
 
       - name: Bygg signert Release APK
