@@ -1,42 +1,33 @@
 workflows:
-  android-debug-apk:
-    name: Android Debug APK (no EAS)
-    max_build_duration: 90
+  android-release-apk:
+    name: Android Release APK
+    max_build_duration: 60
     environment:
-      node: 20
-      java: 17
       vars:
-        EXPO_NO_TELEMETRY: "1"
-    cache:
-      cache_paths:
-        - ~/.npm
-        - $CM_BUILD_DIR/node_modules
-        - $CM_BUILD_DIR/android/.gradle
-        - ~/.gradle
+        ANDROID_APP_DIR: "android"
+        ANDROID_MODULE: "app"
     scripts:
-      - name: Install JS deps
+      - name: Gjenopprett keystore fra base64
         script: |
-          echo "legacy-peer-deps=true" > .npmrc
-          if [ -f package-lock.json ]; then
-            npm ci --no-audit --fund=false
-          else
-            npm install --no-audit --fund=false
-          fi
-      - name: Prebuild native Android project
+          echo "Restoring keystore to android/app/upload-keystore.jks"
+          mkdir -p $CM_BUILD_DIR/android/app
+          echo $CM_KEYSTORE | base64 --decode > $CM_BUILD_DIR/android/app/upload-keystore.jks
+
+      - name: Legg til signing-properties til Gradle
         script: |
-          npx expo install || true
-          npx expo prebuild --platform android --no-install --clean
-      - name: Sync deps after prebuild
+          cat >> $CM_BUILD_DIR/android/gradle.properties <<EOF
+          MYAPP_UPLOAD_STORE_FILE=upload-keystore.jks
+          MYAPP_UPLOAD_KEY_ALIAS=$CM_KEY_ALIAS
+          MYAPP_UPLOAD_STORE_PASSWORD=$CM_KEYSTORE_PASSWORD
+          MYAPP_UPLOAD_KEY_PASSWORD=$CM_KEY_PASSWORD
+          EOF
+          echo "Signing properties appended to android/gradle.properties"
+
+      - name: Bygg Release APK (signert)
         script: |
-          if [ -f package-lock.json ]; then
-            npm ci --no-audit --fund=false
-          else
-            npm install --no-audit --fund=false
-          fi
-      - name: Build debug APK with Gradle
-        script: |
-          chmod +x android/gradlew
           cd android
-          ./gradlew assembleDebug -x lint -x test
+          ./gradlew clean
+          ./gradlew :app:assembleRelease
+
     artifacts:
-      - android/app/build/outputs/apk/debug/*.apk
+      - android/app/build/outputs/apk/release/app-release.apk
