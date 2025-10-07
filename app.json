@@ -18,6 +18,8 @@
       "bundleIdentifier": "app.rork.ultra-crew-nutrition-health-assistant"
     },
     "android": {
+      "versionCode": 2,
+      "package": "no.norum.crewapp",
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
