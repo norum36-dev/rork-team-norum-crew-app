@@ -4,14 +4,28 @@ workflows:
     max_build_duration: 60
     environment:
       vars:
-        NODE_VERSION: "20"
+        # Ikke bruk nvm; Codemagic-bildet har allerede Node
+        # Vi lar Corepack styre Yarn om yarn.lock finnes
+        CI: "true"
     scripts:
-      - name: Installer Node og avhengigheter
+      - name: Installer avhengigheter (auto-detect Yarn/NPM)
         script: |
-          echo "Using Node $NODE_VERSION"
-          nvm install $NODE_VERSION
-          nvm use $NODE_VERSION
-          npm ci
+          if [ -f yarn.lock ]; then
+            echo "Detected yarn.lock → using Yarn"
+            corepack enable
+            corepack prepare yarn@stable --activate
+            yarn install --frozen-lockfile
+            export PKG_MGR="yarn"
+          elif [ -f package-lock.json ]; then
+            echo "Detected package-lock.json → using NPM (ci)"
+            npm ci
+            export PKG_MGR="npm"
+          else
+            echo "No lockfile found → fallback to NPM install"
+            npm install
+            export PKG_MGR="npm"
+          fi
+          echo "Package manager: $PKG_MGR"
 
       - name: Generer native Android-prosjekt (expo prebuild)
         script: |
@@ -33,7 +47,8 @@ workflows:
           MYAPP_UPLOAD_KEY_PASSWORD=$CM_KEY_PASSWORD
           EOF
           echo "Signing properties appended to android/gradle.properties"
-          cat $CM_BUILD_DIR/android/gradle.properties | sed 's/.*PASSWORD.*/[HIDDEN]/g'
+          # Masker passord i logg
+          sed -E 's/(PASSWORD=).+/\1[HIDDEN]/g' $CM_BUILD_DIR/android/gradle.properties || true
 
       - name: Bygg signert Release APK
         script: |
