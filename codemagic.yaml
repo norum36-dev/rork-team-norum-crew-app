@@ -11,8 +11,8 @@ workflows:
       cache_paths:
         - ~/.npm
         - $CM_BUILD_DIR/node_modules
-        scripts:
-      - name: Install dependencies (npm)
+    scripts:
+      - name: Install dependencies (npm, stabil og rask)
         script: |
           echo "legacy-peer-deps=true" > .npmrc
           if [ -f package-lock.json ]; then
@@ -24,10 +24,13 @@ workflows:
         script: |
           npm i -g eas-cli
           eas whoami || eas login --token "$EXPO_TOKEN"
-      - name: Trigger EAS build (no wait) and print URL
+      - name: Build Android APK with EAS (preview profile)
         script: |
-          URL=$(eas build -p android --profile preview --non-interactive --no-wait --json | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{const j=JSON.parse(s);const b=Array.isArray(j)?j[0]:j;console.log(b?.webUrl||b?.dashboardUrl||b?.buildUrl||'');});")
-          echo "EAS build URL: $URL"
-          echo "$URL" > eas_build_url.txt
+          eas build -p android --profile preview --non-interactive --json > build.json
+      - name: Download APK artifact
+        script: |
+          mkdir -p artifacts
+          node -e "const fs=require('fs'); const j=JSON.parse(fs.readFileSync('build.json','utf8')); const b=Array.isArray(j)?j[0]:j; const u=b?.artifacts?.applicationArchiveUrl||b?.artifacts?.buildUrl; if(!u){console.error(j); throw new Error('No APK URL');} console.log(u)" > apk_url.txt
+          curl -L "$(cat apk_url.txt)" -o artifacts/app-preview.apk
     artifacts:
       - artifacts/*.apk
