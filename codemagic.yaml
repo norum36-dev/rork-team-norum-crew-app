@@ -1,18 +1,24 @@
 workflows:
   expo-apk:
     name: Expo APK
-    max_build_duration: 60
+    # Øk tidslimit fra 60 til 120 min
+    max_build_duration: 120
     environment:
       node: 20
       groups:
-        - expo        # <- dette er gruppa du laget med EXPO_TOKEN
+        - expo
+    cache:
+      cache_paths:
+        - ~/.npm
+        - $CM_BUILD_DIR/node_modules
     scripts:
-      - name: Install dependencies
+      - name: Install dependencies (npm, stabil og rask)
         script: |
+          echo "legacy-peer-deps=true" > .npmrc
           if [ -f package-lock.json ]; then
-            npm ci
+            npm ci --no-audit --fund=false
           else
-            npm install --legacy-peer-deps
+            npm install --no-audit --fund=false
           fi
       - name: Install EAS CLI and auth
         script: |
@@ -24,7 +30,7 @@ workflows:
       - name: Download APK artifact
         script: |
           mkdir -p artifacts
-          node -e "const fs=require('fs'); const j=JSON.parse(fs.readFileSync('build.json','utf8')); const url=(j[0]?.artifacts?.applicationArchiveUrl)||(j[0]?.artifacts?.buildUrl)||(j.artifacts?.applicationArchiveUrl)||(j.artifacts?.buildUrl); if(!url){throw new Error('No APK URL');} console.log(url)" > apk_url.txt
+          node -e "const fs=require('fs'); const j=JSON.parse(fs.readFileSync('build.json','utf8')); const b=Array.isArray(j)?j[0]:j; const u=b?.artifacts?.applicationArchiveUrl||b?.artifacts?.buildUrl; if(!u){console.error(j); throw new Error('No APK URL');} console.log(u)" > apk_url.txt
           curl -L "$(cat apk_url.txt)" -o artifacts/app-preview.apk
     artifacts:
       - artifacts/*.apk
