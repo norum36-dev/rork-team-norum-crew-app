@@ -5,8 +5,6 @@ workflows:
     environment:
       node: 20
       java: 17
-      android:
-        ndk: 26.1.10909125
       vars:
         EXPO_NO_TELEMETRY: "1"
     cache:
@@ -35,8 +33,9 @@ workflows:
           else
             npm install --no-audit --fund=false
           fi
-      - name: Build debug APK with Gradle (no signing needed)
+      - name: Build debug APK with Gradle
         script: |
+          chmod +x android/gradlew
           cd android
           ./gradlew assembleDebug -x lint -x test
     artifacts:
