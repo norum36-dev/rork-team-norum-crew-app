@@ -1,17 +1,22 @@
 workflows:
-  expo-apk:
-    name: Expo APK (no-wait)
-    # Kort og robust: vi *triggrer* EAS-build og avslutter jobben raskt.
+  android-debug-apk:
+    name: Android Debug APK (no EAS)
+    max_build_duration: 90
     environment:
       node: 20
-      groups:
-        - expo        # inneholder EXPO_TOKEN i Codemagic
+      java: 17
+      android:
+        ndk: 26.1.10909125
+      vars:
+        EXPO_NO_TELEMETRY: "1"
     cache:
       cache_paths:
         - ~/.npm
         - $CM_BUILD_DIR/node_modules
+        - $CM_BUILD_DIR/android/.gradle
+        - ~/.gradle
     scripts:
-      - name: Install dependencies (npm, tolerant)
+      - name: Install JS deps
         script: |
           echo "legacy-peer-deps=true" > .npmrc
           if [ -f package-lock.json ]; then
@@ -19,15 +24,20 @@ workflows:
           else
             npm install --no-audit --fund=false
           fi
-      - name: Install EAS CLI and authenticate
+      - name: Prebuild native Android project
         script: |
-          npm i -g eas-cli
-          eas whoami || eas login --token "$EXPO_TOKEN"
-      - name: Trigger EAS build (do not wait) and print dashboard URL
+          npx expo install || true
+          npx expo prebuild --platform android --no-install --clean
+      - name: Sync deps after prebuild
         script: |
-          URL=$(eas build -p android --profile preview --non-interactive --no-wait --json | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{const j=JSON.parse(s);const b=Array.isArray(j)?j[0]:j;console.log(b?.webUrl||b?.dashboardUrl||b?.buildUrl||'')});")
-          echo "EAS build URL: $URL"
-          mkdir -p artifacts
-          echo "$URL" > artifacts/eas_build_url.txt
+          if [ -f package-lock.json ]; then
+            npm ci --no-audit --fund=false
+          else
+            npm install --no-audit --fund=false
+          fi
+      - name: Build debug APK with Gradle (no signing needed)
+        script: |
+          cd android
+          ./gradlew assembleDebug -x lint -x test
     artifacts:
-      - artifacts/eas_build_url.txt
+      - android/app/build/outputs/apk/debug/*.apk
