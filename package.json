@@ -2,12 +2,15 @@
   "name": "expo-app",
   "main": "expo-router/entry",
   "version": "1.0.0",
-  "scripts": {
-    "start": "bunx rork start -p vutj92ufory50dlv7j9ul --tunnel",
-    "start-web": "bunx rork start -p vutj92ufory50dlv7j9ul --web --tunnel",
-    "start-web-dev": "DEBUG=expo* bunx rork start -p vutj92ufory50dlv7j9ul --web --tunnel",
-    "lint": "expo lint"
-  },
+"scripts": {
+  "start": "bunx rork start -p vutj92ufory50dlv7j9ul --tunnel",
+  "start-web": "bunx rork start -p vutj92ufory50dlv7j9ul --web --tunnel",
+  "start-web-dev": "DEBUG=expo* bunx rork start -p vutj92ufory50dlv7j9ul --web --tunnel",
+  "lint": "expo lint",
+  "postinstall": "npx --yes expo install react react-dom react-native",
+  "start-expo": "expo start",
+  "web": "expo start --web"
+}
   "dependencies": {
     "@expo/vector-icons": "^14.1.0",
     "@nkzw/create-context-hook": "^1.1.0",
