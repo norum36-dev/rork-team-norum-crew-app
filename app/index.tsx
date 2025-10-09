@@ -1,49 +1,12 @@
-import { Redirect } from 'expo-router';
-import { useRaceStore } from '@/stores/race-context';
-import { useEffect, useState } from 'react';
-import { View, Text, StyleSheet } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { View, Text } from "react-native";
 
-export default function Index() {
-  const { race, initializeRace } = useRaceStore();
-  const [isInitializing, setIsInitializing] = useState(false);
-  const insets = useSafeAreaInsets();
-  
-  useEffect(() => {
-    // If no race exists, initialize with default settings
-    if (!race && !isInitializing) {
-      setIsInitializing(true);
-      initializeRace();
-    }
-  }, [race, initializeRace, isInitializing]);
-  
-  // Show loading while initializing
-  if (isInitializing && !race) {
-    return (
-      <View style={[styles.container, { paddingTop: insets.top }]}>
-        <Text style={styles.loadingText}>Initialiserer løp...</Text>
-      </View>
-    );
-  }
-  
-  // If no race is configured, go to setup
-  if (!race) {
-    return <Redirect href="/setup" />;
-  }
-  
-  // Otherwise go to the main app
-  return <Redirect href="/(tabs)/now" />;
+export default function IndexScreen() {
+  return (
+    <View style={{ flex: 1, alignItems: "center", justifyContent: "center", padding: 24 }}>
+      <Text style={{ fontSize: 20, fontWeight: "600", marginBottom: 12 }}>
+        Rork preview test – Jo Inge
+      </Text>
+      <Text>Hvis du ser denne teksten i nettleseren, funker preview 🎯</Text>
+    </View>
+  );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#F9FAFB',
-  },
-  loadingText: {
-    fontSize: 18,
-    color: '#6B7280',
-  },
-});
